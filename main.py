@@ -1,19 +1,35 @@
 import flet as ft
 from assets.images.img64 import b64_equipamento, b64_software, b64_sistema, b64_rede
 from crud import usuarioCRUD
+from crud import privilegioCRUD
+import autenticacao as aut
 import configure
 
+
 def main(page: ft.Page):
+    token_atual = None
+    
+    def sair():
+        global token_atual
+        
+        aut.desativar_sessao(token_atual)
+        token_atual=''
+        page.clean()
+        page.add(pagina_login())
     
     def pagina_login():
         
         def validar_login():
+            global token_atual
             usuario = tfUsuario.value
             senha = tfSenha.value
             
-            pesquisar_usuario = usuarioCRUD.selecionar_usuario_login(usuario)
-            if pesquisar_usuario:
-                if pesquisar_usuario.senha_usuario == senha:
+            token_atual = aut.autenticar_usuario(usuario, senha)
+            if token_atual:
+                tela_pagina_inicial()
+                
+            else:
+                gerar_alerta('Usuario ou senha Incorreto.', 'alerta')
                     
             
         
@@ -50,7 +66,7 @@ def main(page: ft.Page):
                             ),
                             style=ft.ButtonStyle(bgcolor=ft.colors.BLUE,shape=ft.RoundedRectangleBorder(radius=5)),
                             height=50,
-                            on_click=lambda e: print('Entrar'),
+                            on_click=lambda e: validar_login(),
                             expand=True
                         )
                     ], alignment=ft.MainAxisAlignment.CENTER)
@@ -67,12 +83,33 @@ def main(page: ft.Page):
         
         return ft.Row([pagina_login], expand=True)
     
+    def autenticar_usuario():
+        global token_atual
+        if not (aut.verificar_sessao(token_atual) is None):
+            return True
+        else:
+            page.clean()
+            page.add(pagina_login())
+            page.update()
+            gerar_alerta('Sessao Expirada. Entre novamente!', 'alerta')
+            return None
+    
     def close_banner(e):
             page.close(banner_aviso)
         
     def fechar_tela_modal(e):
             page.close(tela_modal)
-            
+    
+    def gerar_alerta(mensagem, tipo):
+        tipos = {'info': {'bg_color':ft.colors.BLUE_100, 'icone':ft.icons.INFO_ROUNDED, 'icone_color':ft.colors.BLUE},
+                 'alerta': {'bg_color':ft.colors.AMBER_100, 'icone': ft.icons.WARNING_AMBER_ROUNDED, 'icone_color':ft.colors.AMBER},
+                 'sucesso': {'bg_color':ft.colors.GREEN_100, 'icone': ft.icons.VERIFIED_ROUNDED, 'icone_color':ft.colors.GREEN}}
+        conteudo_banner.controls.clear()
+        conteudo_banner.controls.append(ft.Text(mensagem, **text_config_dados_chamado))
+        banner_aviso.bgcolor = tipos[tipo].get('bg_color')
+        banner_aviso.leading = ft.Icon(tipos[tipo].get('icone'), color=tipos[tipo].get('icone_color'), size=40)
+        page.open(banner_aviso) 
+        
     conteudo_banner = ft.ResponsiveRow([])
     banner_aviso = ft.Banner(
         content=conteudo_banner,
@@ -94,17 +131,15 @@ def main(page: ft.Page):
     estilo_text = ft.TextStyle(size=18, font_family='Inter',color=ft.colors.BLACK)
     estilo_label = ft.TextStyle(size=18, font_family='Inter',color=ft.colors.BLACK)
     text_config_titulo = {'font_family':'Inter', 'size':30, 'weight':ft.FontWeight.BOLD}
+    text_config_column = {'font_family':'Inter', 'size':20, 'weight':ft.FontWeight.BOLD}
+    text_config_rows = {'font_family':'Inter', 'size':17}
     text_config_campo = {'font_family':'Inter', 'size':20, 'weight':ft.FontWeight.BOLD}
     text_config_titulo_chamado = {'font_family':'Inter', 'size':18, 'weight':ft.FontWeight.BOLD}
     text_config_dados_chamado = {'font_family':'Inter', 'size':17}
     estilo_dropdown = ft.TextStyle(size=18, font_family='Inter',color=ft.colors.BLACK)
     dropdown_bg = ft.colors.WHITE
+
     
-    def alterar_template(container):
-        conteudo_dinamico.controls.clear()
-        conteudo_dinamico.controls.append(container)
-        page.update()
-        
     def template_novo_chamado():
         def abrir_novo_chamado():
             print(f"\n\nTitulo:{tfTitulo.value}\nSetor: {cbSetor.value}\nCategoria: {cbCategoria.value}\nPrioridade: {cbPrioridade.value}\nDetalhes: {tfDetalhes.value}\n\n")
@@ -463,125 +498,338 @@ def main(page: ft.Page):
         
         return ft.Container(pagina_chamados, padding=20, expand=True, expand_loose=True)
     
-    
-    
-    botao_meus_chamado = ft.Container(
-        content=ft.Text(
-            'Meus Chamados',
-            size=18,             # Tamanho da fonte
-            font_family="Inter", # Nome da fonte
-            color=ft.colors.BLACK # Cor do texto
-        ),
-        alignment=ft.alignment.center,
-        bgcolor=ft.colors.BLUE,
-        padding=10,
-        on_click=lambda e: alterar_template(template_meus_chamados()),
-        border_radius=5
-    )
-    
-    botao_novo_chamado = ft.TextButton(
-        content=ft.Text(
-            'Abrir Novo Chamado',
-            size=18,           
-            font_family="Inter",
-            color=ft.colors.WHITE,
-            weight=ft.FontWeight.BOLD
-        ),
-        style=ft.ButtonStyle(bgcolor=ft.colors.BLACK,shape=ft.RoundedRectangleBorder(radius=5)),
-        height=50,
-        on_click=lambda e: alterar_template(template_novo_chamado()),
-        expand=True
-    )
-                 
-    botao_menu_usuario = ft.PopupMenuButton(
-        content=ft.Icon(ft.icons.MORE_HORIZ, color=ft.colors.BLACK,size=32),
-        items=[
-            ft.PopupMenuItem(content=ft.Row([
-                ft.Icon(ft.icons.SUPERVISED_USER_CIRCLE, color=ft.colors.BLACK),
-                ft.Text('Meu Perfil', font_family='Inter')]),
-                            on_click=lambda e : alterar_template(template_perfil_usuario())),
-            ft.PopupMenuItem(content=ft.Row([
-                ft.Icon(ft.icons.EXIT_TO_APP, color=ft.colors.BLACK),
-                ft.Text('Sair', font_family='Inter')])),
-        ],
-    )
-            
-    titulo_sistema = ft.Text(
-        "HelpDesk",
-        size=35,             
-        font_family="Inter", 
-        weight=ft.FontWeight.BOLD,
-        color=ft.colors.BLACK
-    )
-    
-    linha_titulo_menu = ft.ResponsiveRow([
-        ft.Row([titulo_sistema], col=10),
-        ft.Row([botao_menu_usuario], col=2, left=ft.Stack(left=10))
-        ],
-        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-    )
-    
-    menu_opcoes = ft.Column([
-        ft.ResponsiveRow([
-            botao_meus_chamado,
-        ]),
-        ft.ResponsiveRow([
-            botao_novo_chamado,
-        ])
-        ],
-        expand=True,
-        alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-    )
-
-    container_menu = ft.Container(
-        content=ft.Column([linha_titulo_menu, menu_opcoes]),
-        width=300,
-        bgcolor=ft.colors.BLUE,
-        padding=20,
-        margin=0,
-        alignment=ft.alignment.center
-    )
-
-
-    conteudo_dinamico = ft.Column(
-        [template_meus_chamados()],
-        spacing=0,
-        expand=True,
-    )
-
-
-    container_dinamico = ft.Container(
-        content=conteudo_dinamico,
-        expand=True,
-        bgcolor=ft.colors.WHITE,
-        alignment=ft.alignment.center,
-        padding=0,
-        margin=0
-    )
-    
-    rodape = ft.Container(content=ft.Column([
-        ft.Row([
-            ft.Text('HelpDesk', font_family='Inter', size=17, color=ft.colors.BLUE,
-                    weight=ft.FontWeight.BOLD)
-        ]),
-        ft.Divider(height=2),
-        ft.Row([
-            ft.Text("Rafael Soares. Todos os direitos reservados.")
-        ])
-    ]), height=80,padding=10, bgcolor=ft.colors.WHITE)
-
+    def template_gerenciar_usuarios():
         
-    pagina_principal = ft.Row([
-            container_menu,
+        def adicionar_novo_usuario(usuario):
+            
+            tabela_usuarios.rows.append(
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text(usuario.id, **text_config_rows)),
+                        ft.DataCell(ft.Text(usuario.nome_completo, **text_config_rows)),
+                        ft.DataCell(ft.Text(usuario.usuario, **text_config_rows)),
+                        ft.DataCell(ft.Text(usuario.privilegio.nome, **text_config_rows)),
+                        ft.DataCell(content=ft.Row([
+                            ft.TextButton(content=ft.Text('Editar', font_family='Inter',
+                                                        size=17, color=ft.colors.WHITE),
+                                        style=ft.ButtonStyle(bgcolor=ft.colors.SECONDARY,shape=ft.RoundedRectangleBorder(radius=5)),
+                                        height=40),
+                            ft.TextButton(content=ft.Text('Excluir', font_family='Inter',
+                                                size=17, color=ft.colors.WHITE),
+                                style=ft.ButtonStyle(bgcolor=ft.colors.RED,shape=ft.RoundedRectangleBorder(radius=5)),
+                                height=40)
+                        ]))
+                    ]
+                )
+            )
+            page.update()
+        
+        def cadastrar_usuario():
+            global token_atual
+            nomeCompleto = tf_nomeCompleto.value
+            usuario = tf_usuario.value
+            id_privilegio = privilegioCRUD.selecionar_id_status_por_nome(dd_privilegio.value)
+            senha = tf_senha.value
+            confSenha = tf_confSenha.value
+            if autenticar_usuario():
+                if senha == confSenha:
+                    usuario = usuarioCRUD.adicionar_usuario(nomeCompleto, usuario, senha, id_privilegio)
+                    if usuario:
+                        gerar_alerta('Usuario cadastrado com sucesso!', 'sucesso')
+                        adicionar_novo_usuario(usuario)
+                    else:
+                        gerar_alerta('Usuario ja existe!', 'alerta')
+                else:
+                    gerar_alerta('As senha precisam ser iguais.', 'alerta')
+            
+        def carregar_usuarios():
+            usuarios = []
+            for user in usuarioCRUD.selecionar_todos_usuarios():
+                usuarios.append(ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text(user.id, **text_config_rows)),
+                        ft.DataCell(ft.Text(user.nome_completo, **text_config_rows)),
+                        ft.DataCell(ft.Text(user.usuario, **text_config_rows)),
+                        ft.DataCell(ft.Text(user.privilegio.nome, **text_config_rows)),
+                        ft.DataCell(content=ft.Row([
+                            ft.TextButton(content=ft.Text('Editar', font_family='Inter',
+                                                          size=17, color=ft.colors.WHITE),
+                                          style=ft.ButtonStyle(bgcolor=ft.colors.SECONDARY,shape=ft.RoundedRectangleBorder(radius=5)),
+                                          height=40),
+                            ft.TextButton(content=ft.Text('Excluir', font_family='Inter',
+                                                          size=17, color=ft.colors.WHITE),
+                                          style=ft.ButtonStyle(bgcolor=ft.colors.RED,shape=ft.RoundedRectangleBorder(radius=5)),
+                                          height=40)
+                        ]))
+                    ]
+                ))
+            return usuarios
+            
+        carregar_usuarios()
+        
+        tf_nomeCompleto = ft.TextField(label='Nome Completo', text_style=estilo_text, label_style=estilo_label, col=8)
+        tf_usuario = ft.TextField(label='Usuario', col=4, text_style=estilo_text, label_style=estilo_label)
+        dd_privilegio = ft.Dropdown(options=[
+            *[ft.dropdown.Option(x) for x in privilegioCRUD.seleciona_nome_privilegio()]
+        ], col=3, label='Privilegio')
+        tf_senha = ft.TextField(label='Senha', password=True, can_reveal_password=True, col=3,
+                             text_style=estilo_text, label_style=estilo_label)
+        tf_confSenha = ft.TextField(label='Confirmar Senha', password=True, can_reveal_password=True, col=3,
+                             text_style=estilo_text, label_style=estilo_label)
+        form_usuario = ft.ResponsiveRow([
+            ft.Text('Cadastrar Usuario', **text_config_titulo),
+            ft.ResponsiveRow([
+                tf_nomeCompleto,
+                tf_usuario
+                
+            ]),
+            ft.ResponsiveRow([
+                dd_privilegio,
+                tf_senha,
+                tf_confSenha,
+                ft.TextButton(content=ft.Text('Cadastrar', font_family='Inter', color=ft.colors.WHITE,size=18,
+                                              weight=ft.FontWeight.BOLD),
+                              col=3, height=50,
+                              style=ft.ButtonStyle(bgcolor=ft.colors.BLUE,shape=ft.RoundedRectangleBorder(radius=5)),
+                              expand=True,
+                              on_click=lambda e: cadastrar_usuario())
+            ])
+
+        ], spacing=20)
+        
+        tabela_usuarios = ft.DataTable(
+                    columns=[
+                        ft.DataColumn(ft.Text('ID', **text_config_column, width=30)),
+                        ft.DataColumn(ft.Text('Nome Completo', **text_config_column,
+                                              text_align=ft.TextAlign.START, width=300)),
+                        ft.DataColumn(ft.Text('Usuario', **text_config_column)),
+                        ft.DataColumn(ft.Text('Privilegio', **text_config_column, width=100)),
+                        ft.DataColumn(ft.Text('', weight=100))
+                    ],
+                    rows=[*carregar_usuarios()],
+                    width=page.width,
+                    expand=True,
+                    expand_loose=True
+                )
+        
+        lista_usuarios = ft.ResponsiveRow([
+            ft.ResponsiveRow([
+                ft.Text('Lista de Usuarios', **text_config_titulo)
+            ], alignment=ft.MainAxisAlignment.CENTER),
+            ft.ResponsiveRow([
+                
+                ft.TextField(icon=ft.icons.SEARCH, hint_text='Digite o nome do usuario...',
+                             expand=True, col=10),
+                ft.TextButton(content=ft.Text('Pesquisar',size=18, font_family="Inter",
+                                    color=ft.colors.WHITE, weight=ft.FontWeight.BOLD),
+                style=ft.ButtonStyle(bgcolor=ft.colors.BLUE,shape=ft.RoundedRectangleBorder(radius=5)),
+                height=50,
+                on_click=lambda e: print("Pesquisar"),
+                expand=True, col=2),
+            ]),
+           
             ft.Column([
-                container_dinamico,
-                rodape 
-                ], expand=True, spacing=0)
-        ],
-        expand=True,
-        spacing=0,
-    )
+                tabela_usuarios
+                ], scroll=ft.ScrollMode.AUTO)
+        
+        ])
+        
+        return ft.Container(content=ft.ResponsiveRow([
+                form_usuario,
+                lista_usuarios
+            ], spacing=50),
+            padding=20)
     
+    def tela_pagina_inicial():
+        global token_atual
+        
+        def alterar_template(container):
+            global token_atual
+            if not (aut.verificar_sessao(token_atual) is None):
+                conteudo_dinamico.controls.clear()
+                conteudo_dinamico.controls.append(container)
+                page.update()
+            else:
+                page.clean()
+                page.add(pagina_login())
+                page.update()
+                gerar_alerta('A sessao Expirou. Entre novamente!', 'alerta')
+        
+        bt_meus_chamados = ft.Container(
+            content=ft.Text(
+                'Meus Chamados',
+                size=18,
+                font_family="Inter", 
+                color=ft.colors.BLACK 
+            ),
+            alignment=ft.alignment.center_left,
+            bgcolor=ft.colors.BLUE,
+            padding=10,
+            on_click=lambda e: alterar_template(template_meus_chamados()),
+            border_radius=5
+        )
+    
+        bt_novo_chamado = ft.TextButton(
+            content=ft.Text(
+                'Abrir Novo Chamado',
+                size=18,           
+                font_family="Inter",
+                color=ft.colors.WHITE,
+                weight=ft.FontWeight.BOLD
+            ),
+            style=ft.ButtonStyle(bgcolor=ft.colors.BLACK,shape=ft.RoundedRectangleBorder(radius=5)),
+            height=50,
+            on_click=lambda e: alterar_template(template_novo_chamado()),
+            expand=True
+        )
+    
+        bt_gerenciar_chamados = ft.ResponsiveRow([
+            ft.Container(
+                content=ft.Text(
+                    'Gerenciar Chamados',
+                    size=18,
+                    font_family="Inter", 
+                    color=ft.colors.BLACK 
+                ),
+                alignment=ft.alignment.center_left,
+                bgcolor=ft.colors.BLUE,
+                padding=10,
+                on_click=lambda e: alterar_template(template_meus_chamados()),
+                border_radius=5
+            )
+        ])
+        
+        bt_gerenciar_usuarios = ft.ResponsiveRow([
+            ft.Container(
+                content=ft.Text(
+                    'Gerenciar Usuarios',
+                    size=18,
+                    font_family="Inter", 
+                    color=ft.colors.BLACK 
+                ),
+                alignment=ft.alignment.center_left,
+                bgcolor=ft.colors.BLUE,
+                padding=10,
+                on_click=lambda e: alterar_template(template_gerenciar_usuarios()),
+                border_radius=5
+            )
+        ])
+        
+        bt_gerenciar_setores = ft.ResponsiveRow([
+            ft.Container(
+                content=ft.Text(
+                    'Gerenciar Setores',
+                    size=18,
+                    font_family="Inter", 
+                    color=ft.colors.BLACK,
+                    text_align=ft.TextAlign.START
+                ),
+                alignment=ft.alignment.center_left,
+                bgcolor=ft.colors.BLUE,
+                padding=10,
+                on_click=lambda e: alterar_template(template_meus_chamados()),
+                border_radius=5
+            )
+        ])
+                    
+        botao_menu_usuario = ft.PopupMenuButton(
+            content=ft.Icon(ft.icons.MORE_HORIZ, color=ft.colors.BLACK,size=32),
+            items=[
+                ft.PopupMenuItem(content=ft.Row([
+                    ft.Icon(ft.icons.SUPERVISED_USER_CIRCLE, color=ft.colors.BLACK),
+                    ft.Text('Meu Perfil', font_family='Inter')]),
+                                on_click=lambda e : alterar_template(template_perfil_usuario())),
+                ft.PopupMenuItem(content=ft.Row([
+                    ft.Icon(ft.icons.EXIT_TO_APP, color=ft.colors.BLACK),
+                    ft.Text('Sair', font_family='Inter')]),
+                                on_click=lambda e: sair()),
+            ],
+        )
+                
+        titulo_sistema = ft.Text(
+            "HelpDesk",
+            size=35,             
+            font_family="Inter", 
+            weight=ft.FontWeight.BOLD,
+            color=ft.colors.BLACK
+        )
+        
+        linha_titulo_menu = ft.ResponsiveRow([
+            ft.Row([titulo_sistema], col=10),
+            ft.Row([botao_menu_usuario], col=2, left=ft.Stack(left=10))
+            ],
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        )
+        
+        menu_opcoes = ft.Column([
+            ],
+            expand=True,
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+        )
+        
+        if aut.verificar_sessao(token_atual):
+            usuario = aut.verificar_sessao(token_atual)
+            if usuario.privilegio.id == 3:
+                menu_opcoes.controls.append(ft.ResponsiveRow([
+                    bt_gerenciar_chamados,
+                    bt_gerenciar_usuarios,
+                    bt_gerenciar_setores
+                ]))
+        
+            else:
+                menu_opcoes.controls.append(bt_novo_chamado)
+                menu_opcoes.controls.append(bt_novo_chamado)
+            
+
+        container_menu = ft.Container(
+            content=ft.Column([linha_titulo_menu, menu_opcoes]),
+            width=300,
+            bgcolor=ft.colors.BLUE,
+            padding=20,
+            margin=0,
+            alignment=ft.alignment.center
+        )
+
+        conteudo_dinamico = ft.Column(
+            [],
+            spacing=0,
+            expand=True,
+        )
+
+        container_dinamico = ft.Container(
+            content=conteudo_dinamico,
+            expand=True,
+            bgcolor=ft.colors.WHITE,
+            alignment=ft.alignment.center,
+            padding=0,
+            margin=0
+        )
+        
+        rodape = ft.Container(content=ft.Column([
+            ft.Row([
+                ft.Text('HelpDesk', font_family='Inter', size=17, color=ft.colors.BLUE,
+                        weight=ft.FontWeight.BOLD)
+            ]),
+            ft.Divider(height=2),
+            ft.Row([
+                ft.Text("Rafael Soares. Todos os direitos reservados.")
+            ])
+        ]), height=80,padding=10, bgcolor=ft.colors.WHITE)
+    
+        pagina_principal = ft.Row([
+                container_menu,
+                ft.Column([
+                    container_dinamico,
+                    rodape 
+                    ], expand=True, spacing=0)
+            ],
+            expand=True,
+            spacing=0,
+        )
+        
+        page.clean()
+        page.add(pagina_principal)
+        
     
     page.add(pagina_login())
     page.update()
